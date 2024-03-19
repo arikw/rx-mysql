@@ -1,0 +1,36 @@
+{
+
+  "eslint.format.enable": true,
+  "eslint.debug": false,
+  "eslint.workingDirectories": [{ "mode": "location" }],
+
+  "javascript.format.enable": false,
+  "json.format.enable": false,
+
+  "[json]": {
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+  },
+
+  "[javascript]": {
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+    "editor.detectIndentation": false,
+    "editor.tabSize": 2,
+    "editor.formatOnType": true,
+    "editor.formatOnSaveMode": "modifications",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit",
+      "source.fixAll.stylelint": "explicit"
+    }
+  },
+
+  "search.useIgnoreFiles": false,
+
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/*/**": true
+  }
+}

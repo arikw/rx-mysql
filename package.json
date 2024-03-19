@@ -1,0 +1,50 @@
+{
+  "name": "rx-mysql",
+  "version": "1.0.0",
+  "description": "An opinionated MySQL driver for Node.js, offering intuitive query handling, secure database connections, and efficient data management with minimal setup",
+  "author": "Arik W",
+  "license": "MIT",
+  "scripts": {
+    "test": "mocha tests/"
+  },
+  "devDependencies": {
+    "chai": "^4.4.1",
+    "eslint": "^8.57.0",
+    "mocha": "^10.3.0",
+    "mock-require": "^3.0.3"
+  },
+  "main": "./dist/rx-mysql.cjs",
+  "exports": {
+    ".": {
+      "import": "./dist/rx-mysql.mjs",
+      "require": "./dist/rx-mysql.cjs",
+      "default": "./src/index.js"
+    }
+  },
+  "files": [
+    "/src",
+    "/dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arikw/rx-mysql.git"
+  },
+  "bugs": {
+    "url": "https://github.com/arikw/rx-mysql/issues"
+  },
+  "homepage": "https://github.com/arikw/rx-mysql#readme",
+  "keywords": [
+    "mysql",
+    "mysql2",
+    "handlebars",
+    "ssh",
+    "tunnel"
+  ],
+  "dependencies": {
+    "change-case": "^4.1.2",
+    "endent": "^2.1.0",
+    "handlebars": "^4.7.8",
+    "mysql2": "^3.9.2",
+    "tunnel-ssh": "^5.1.2"
+  }
+}
