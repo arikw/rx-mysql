@@ -5,7 +5,7 @@ const
 
 // see https://www.npmjs.com/package/mysql#custom-format
 function queryFormat(query, values) {
-  if (!values) { return query; }
+  if (!values || (values?.length === 0)) { return query; }
 
   const poolConnection = this;
   const escape = poolConnection.escape.bind(this);
