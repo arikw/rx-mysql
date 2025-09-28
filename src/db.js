@@ -217,8 +217,8 @@ async function init(config = {}) {
   }
 
   // It is important to understand that many commands in MySQL can cause an implicit commit,
-  async function beginTransaction() {
-    const connection = await pool.getConnection();
+  async function beginTransaction(queryConfig) {
+    const connection = await pool.getConnection(queryConfig);
     await connection.beginTransaction();
 
     return connection;
@@ -230,8 +230,6 @@ async function init(config = {}) {
       get(target, prop, receiver) {
         if (prop === 'query') {
           return (sql, values, options, ...restArgs) => executeQuery.call(target, options, sql, values, ...restArgs);
-        } else if (prop === 'beginTransaction') {
-          return (connectionConfig) => beginTransaction.call(target, connectionConfig);
         }
         return Reflect.get(target, prop, receiver);
       }
@@ -252,7 +250,7 @@ async function init(config = {}) {
         } else if (prop === 'query') {
           return (sql, values, options, ...restArgs) => executeQuery.call(target, options, sql, values, ...restArgs);
         } else if (prop === 'beginTransaction') {
-          return (connectionConfig) => beginTransaction.call(target, connectionConfig);
+          return (queryConfig) => beginTransaction.call(target, queryConfig);
         }
         return Reflect.get(target, prop, receiver);
       }
