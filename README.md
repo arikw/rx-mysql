@@ -5,7 +5,7 @@ An opinionated MySQL driver for Node.js, offering intuitive query handling, secu
 ## Features
 
 - **Intuitive Bind Variables with Escaping:** Safely bind variables to your SQL queries with automatic escaping, reducing the risk of SQL injection.
-- **Query Formatting with Handlebars Templates:** Utilize Handlebars templates for dynamic query generation, enabling complex SQL constructions with ease.
+- **Query Formatting with Handlebars Templates:** Utilize Handlebars templates for dynamic query generation, enabling complex SQL constructions with ease. The `queryFormat` function has been updated to gracefully handle cases where the `values` array is empty, preventing errors and improving robustness.
 - **SSH Tunneling:** Establish secure database connections through SSH tunnels, ensuring your database interactions are encrypted and protected.
 - **Connection Pooling:** Leverages connection pooling by default, optimizing database interactions for performance and scalability.
 - **Auto-conversion to camelCase:** Automatically convert database column names to camelCase for seamless integration with JavaScript codebases.
@@ -14,10 +14,10 @@ An opinionated MySQL driver for Node.js, offering intuitive query handling, secu
 
 ## Installation
 
-Install `rx-mysql` using npm:
+Install `rx-mysql` version 2.0.0 or later using npm:
 
 ```bash
-npm install rx-mysql
+npm install rx-mysql@latest
 ```
 
 ## Usage
@@ -26,12 +26,20 @@ npm install rx-mysql
 
 ```javascript
 const mysql = require('rx-mysql');
-const db = mysql(/* ...options */);
 
 async function main() {
+  // Initialize the database connection. The init function is now async
+  // and returns an object with getInstance, connect, and disconnect methods.
+  const { getInstance, connect, disconnect } = await mysql(/* ...options */);
+
+  // To get the db instance for querying:
+  const db = getInstance();
+
+  // You can also directly use connect and disconnect if you prefer:
+  // await connect();
   const results = await db.query('SELECT * FROM myTable WHERE id = :id', { id: 1 });
   console.log(results);
-  await db.disconnect();
+  await disconnect(); // Use the disconnect method from the returned object
 }
 
 main();
@@ -66,7 +74,7 @@ const db = mysql({
       username: 'root',
       privateKeyFile: '/path/to/certs/id_rsa'
     },
-    forwardOptionsLocal: {
+    forwardOptions: {
       dstAddr: 'localhost',
       dstPort: 3377
     }
@@ -93,6 +101,10 @@ Below is a comprehensive list of available configuration options, their correspo
 | `MYSQL_USER`                    | `user`                             | None               | The username for database authentication.                     |
 | `MYSQL_PASSWORD`                | `password`                         | None               | The password for database authentication.                     |
 | `MYSQL_PORT`                    | `port`                             | `3306`             | Database port.                                                |
+| `MYSQL_MAX_EXECUTION_TIME`      | `maxExecutionTime`                 | `30000`            | Maximum time in milliseconds for a query to execute.          |
+| `MYSQL_LAZY_CONNECT`            | `lazyConnect`                      | `true`             | Whether to connect to the database only on the first query.   |
+| `MYSQL_LOG_LEVEL`               | `logLevel`                         | `'debug' (dev) / 'error' (prod)` | Logging level for database operations.                        |
+| `MYSQL_CONNECTION_LIMIT`        | `connectionLimit`                  | `15`               | Maximum number of connections in the pool.                    |
 | `DB_SSH_TUNNEL_HOST`            | `sshTunnel.sshOptions.host`        | None               | The SSH server host for SSH tunneling.                        |
 | `DB_SSH_TUNNEL_PORT`            | `sshTunnel.sshOptions.port`        | `22`               | The SSH server port.                                          |
 | `DB_SSH_TUNNEL_USERNAME`        | `sshTunnel.sshOptions.username`    | `'root'`           | The username for SSH authentication.                          |
@@ -203,6 +215,109 @@ const db = mysql({
 This configuration establishes an SSH tunnel from the local machine to the remote database server, securely forwarding local TCP port `27017` to the database port `3306` on the server at `localhost`.
 
 For detailed options and additional configuration, refer to the `tunnel-ssh` and `ssh2` documentation.
+
+## Transactions
+
+`rx-mysql` now supports database transactions, allowing you to execute a series of database operations as a single atomic unit. This ensures data integrity by either committing all changes or rolling back all changes if any operation fails.
+
+### `beginTransaction` Method
+
+The `beginTransaction` method initiates a new transaction. It returns a transaction object with `query`, `commit`, and `rollback` methods.
+
+```javascript
+const mysql = require('rx-mysql');
+
+async function main() {
+  const { getInstance, disconnect } = await mysql();
+  const db = getInstance();
+
+  let transaction;
+  try {
+    transaction = await db.beginTransaction();
+
+    // Execute queries within the transaction
+    await transaction.query('INSERT INTO users (name) VALUES (:name)', { name: 'John Doe' });
+    await transaction.query('UPDATE products SET stock = stock - 1 WHERE id = :id', { id: 101 });
+
+    await transaction.commit();
+    console.log('Transaction committed successfully.');
+  } catch (error) {
+    if (transaction) {
+      await transaction.rollback();
+      console.log('Transaction rolled back due to error:', error);
+    } else {
+      console.error('Error starting transaction:', error);
+    }
+  } finally {
+    await disconnect();
+  }
+}
+
+main();
+```
+
+## Migration Guide
+
+This section details the breaking changes introduced in `rx-mysql` version 2.0.0 and provides clear instructions for upgrading from previous versions (1.x).
+
+### `init` function return value
+
+The `init` function is now `async` and returns an object with `getInstance`, `connect`, and `disconnect` methods.
+
+**Before (1.x):**
+```javascript
+const db = mysql(/* ...options */);
+```
+
+**After (2.x):**
+```javascript
+const { getInstance, connect, disconnect } = await mysql(/* ...options */);
+const db = getInstance(); // Use this to get the db instance for querying
+// or directly use connect and disconnect if preferred
+// await connect();
+```
+
+### SSH Tunneling Configuration
+
+The `sshTunnel.forwardOptionsLocal` configuration path has been changed to `sshTunnel.forwardOptions`.
+
+**Before (1.x):**
+```javascript
+sshTunnel: {
+  // ...
+  forwardOptionsLocal: {
+    dstAddr: 'localhost',
+    dstPort: 3377
+  }
+}
+```
+
+**After (2.x):**
+```javascript
+sshTunnel: {
+  // ...
+  forwardOptions: {
+    dstAddr: 'localhost',
+    dstPort: 3377
+  }
+}
+```
+
+### `query` function with `queryConfig`
+
+The `query` function now accepts an optional `queryConfig` object as its first argument, which can include `nativeQuery` and `keepOriginalCasing` options.
+
+**Before (1.x):**
+```javascript
+db.query('SELECT * FROM users', values);
+```
+
+**After (2.x):**
+```javascript
+db.query('SELECT * FROM users', values, { nativeQuery: true, keepOriginalCasing: false });
+// or if no queryConfig is needed, you can still call it as before:
+db.query('SELECT * FROM users', values);
+```
 
 ## Contributing
 

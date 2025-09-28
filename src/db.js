@@ -42,7 +42,7 @@ async function init(config = {}) {
   };
 
   const generalConfig = {
-    logLevel:           config.logLevel           ?? (process.env.NODE_ENV === 'development' ? 'debug' : 'error')
+    logLevel:           config.logLevel           ?? (process.env.MYSQL_LOG_LEVEL ?? (process.env.NODE_ENV === 'development' ? 'debug' : 'error'))
   };
 
   const sshTunnelConfig = {
@@ -135,6 +135,7 @@ async function init(config = {}) {
     if (pool) {
       try {
         await pool.end();
+        log('db pool disconnected');
       } catch (error) {
         // do nothing
       }
