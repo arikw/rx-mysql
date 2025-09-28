@@ -28,17 +28,23 @@ npm install rx-mysql@latest
 const mysql = require('rx-mysql');
 
 async function main() {
-  // Initialize the database connection. The init function is now async
-  // and returns an object with getInstance, connect, and disconnect methods.
-  const { getInstance, connect, disconnect } = await mysql(/* ...options */);
+  // Initialize the database connection
+  const { query, beginTransaction, connect, disconnect } = await mysql(/* ...options */);
 
-  // To get the db instance for querying:
-  const db = getInstance();
-
-  // You can also directly use connect and disconnect if you prefer:
-  // await connect();
-  const results = await db.query('SELECT * FROM myTable WHERE id = :id', { id: 1 });
+  const results = await query('SELECT * FROM myTable WHERE id = :id', { id: 1 });
   console.log(results);
+
+  // Transaction:
+  const transaction = await beginTransaction();
+  try {
+    await transaction.query('INSERT INTO users (name) VALUES (:name)', { name: 'Jane Doe' });
+    await transaction.query('UPDATE products SET stock = stock - 1 WHERE id = :id', { id: 101 });
+    await transaction.commit();
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Transaction failed and was rolled back:', error);
+  }
+
   await disconnect(); // Use the disconnect method from the returned object
 }
 
@@ -260,9 +266,9 @@ main();
 
 This section details the breaking changes introduced in `rx-mysql` version 2.0.0 and provides clear instructions for upgrading from previous versions (1.x).
 
-### `init` function return value
+### Initialization returns value and exposed pool methods
 
-The `init` function is now `async` and returns an object with `getInstance`, `connect`, and `disconnect` methods.
+The initialization function is now `async` and returns an object with `pool` object, and now also directly exposes several methods for convenience: `connect`, `disconnect`, `query`, `beginTransaction`, `escape`, `escapeId`, `format`, and `getConnection`.
 
 **Before (1.x):**
 ```javascript
@@ -271,10 +277,9 @@ const db = mysql(/* ...options */);
 
 **After (2.x):**
 ```javascript
-const { getInstance, connect, disconnect } = await mysql(/* ...options */);
-const db = getInstance(); // Use this to get the db instance for querying
-// or directly use connect and disconnect if preferred
-// await connect();
+const { query, beginTransaction, disconnect } = await mysql(/* ...options */);
+// Use the pool directly for querying and other operations
+const results = await query('SELECT * FROM myTable');
 ```
 
 ### SSH Tunneling Configuration
@@ -301,22 +306,6 @@ sshTunnel: {
     dstPort: 3377
   }
 }
-```
-
-### `query` function with `queryConfig`
-
-The `query` function now accepts an optional `queryConfig` object as its first argument, which can include `nativeQuery` and `keepOriginalCasing` options.
-
-**Before (1.x):**
-```javascript
-db.query('SELECT * FROM users', values);
-```
-
-**After (2.x):**
-```javascript
-db.query('SELECT * FROM users', values, { nativeQuery: true, keepOriginalCasing: false });
-// or if no queryConfig is needed, you can still call it as before:
-db.query('SELECT * FROM users', values);
 ```
 
 ## Contributing

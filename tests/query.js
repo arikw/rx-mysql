@@ -29,7 +29,7 @@ describe('templating and bind variables', () => {
       })
     });
 
-    db = (await require('../src/index.js')()).getInstance();
+    db = (await require('../src/index.js')());
 
   });
 
