@@ -63,6 +63,45 @@ const db = mysql({
 });
 ```
 
+### Query Configuration
+
+The `query` function accepts an optional `queryConfig` object as its last argument, allowing you to customize query behavior.
+
+#### `queryConfig` Options
+
+- `nativeQuery` (boolean): If `true`, the query will be executed as a native MySQL query without any `rx-mysql` specific processing (e.g., camelCase conversion). When `nativeQuery` is `true`, the result format will be the raw output from the MySQL driver (e.g., `[ [...rows], [...fields] ]` for `SELECT` queries), and `keepOriginalCasing` will be ignored as no casing conversion is performed. Defaults to `false`.
+- `keepOriginalCasing` (boolean): If `true`, the column names in the query results will retain their original casing from the database. This option is only effective when `nativeQuery` is `false`. Defaults to `false` (converts to camelCase).
+
+#### Example with `queryConfig`
+
+```javascript
+const { query } = await mysql();
+
+// Example with nativeQuery:
+// The result will be the raw output from the MySQL driver.
+const nativeResults = await query(
+  'SELECT user_id, user_name FROM users',
+  null,
+  { nativeQuery: true }
+);
+console.log(nativeResults); // Example: [ [ { user_id: 1, user_name: 'John Doe' } ], [ ...fields ] ]
+
+// Example with keepOriginalCasing (nativeQuery is false by default):
+const casingResults = await query(
+  'SELECT user_id, user_name FROM users',
+  null,
+  { keepOriginalCasing: true }
+);
+console.log(casingResults); // Example: [{ user_id: 1, user_name: 'John Doe' }]
+
+// Default behavior (nativeQuery: false, keepOriginalCasing: false):
+const defaultResults = await query(
+  'SELECT user_id, user_name FROM users',
+  null
+);
+console.log(defaultResults); // Example: [{ userId: 1, userName: 'John Doe' }]
+```
+
 ### Using SSH Tunnel
 
 ```javascript
@@ -280,6 +319,22 @@ const db = mysql(/* ...options */);
 const { query, beginTransaction, disconnect } = await mysql(/* ...options */);
 // Use the pool directly for querying and other operations
 const results = await query('SELECT * FROM myTable');
+```
+
+### `query` function with `queryConfig`
+
+The `query` function now accepts an optional `queryConfig` object as its *last* argument, which can include `nativeQuery` and `keepOriginalCasing` options.
+
+**Before (1.x):**
+```javascript
+db.query('SELECT * FROM users', values);
+```
+
+**After (2.x):**
+```javascript
+db.query('SELECT * FROM users', values, { nativeQuery: true, keepOriginalCasing: false });
+// or if no queryConfig is needed, you can still call it as before:
+db.query('SELECT * FROM users', values);
 ```
 
 ### SSH Tunneling Configuration
