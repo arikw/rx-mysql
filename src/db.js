@@ -154,7 +154,9 @@ async function init(config = {}) {
     const privateKeyFile = sshTunnelConfig.privateKeyFile;
     const privateKey = sshTunnelConfig.sshOptions.privateKey;
     if (!privateKey && privateKeyFile) {
+      log('reading private key file for ssh tunnel...');
       sshTunnelConfig.sshOptions.privateKey = await readFile(privateKeyFile, 'utf8');
+      log('private key file read', sshTunnelConfig.sshOptions.privateKey.length, 'bytes');
     }
     const [server, sshConnection] = await createTunnel(sshTunnelConfig.tunnelOptions, sshTunnelConfig.serverOptions, sshTunnelConfig.sshOptions, sshTunnelConfig.forwardOptions);
 
@@ -293,9 +295,15 @@ async function init(config = {}) {
   }
 
   return {
-    getInstance: () => resultedPool,
+    pool: resultedPool,
     connect,
-    disconnect
+    disconnect,
+    query: (...args) => resultedPool.query(...args),
+    beginTransaction: (...args) => resultedPool.beginTransaction(...args),
+    escape: (...args) => resultedPool.escape(...args),
+    escapeId: (...args) => resultedPool.escapeId(...args),
+    format: (...args) => resultedPool.format(...args),
+    getConnection: (...args) => resultedPool.getConnection(...args)
   };
 }
 
