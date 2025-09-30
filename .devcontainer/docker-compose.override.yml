@@ -1,0 +1,93 @@
+services:
+  vscode:
+    build:
+      args:
+        WORKDIR: /workspaces/local
+    working_dir: /workspaces/local
+    environment:
+      HOST_TYPE: windows
+      DOCKER_CONFIG: /home/vscode/.docker
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+      DOCKER_HOST_DEFAULT: tcp://docker-socket-proxy:2375
+      UNISONLOCALHOSTNAME: rx-mysql-devcontainer
+      ENV_NAME: devcontainer
+      HOST_USERNAME: $USERNAME
+    volumes:
+      - /home/vscode/.vscode-server
+      - ${HOME:-$USERPROFILE}\.docker:/home/vscode/.docker:cached
+      - ${HOME:-$USERPROFILE}\.gemini:/home/vscode/.gemini:cached
+      - rx-mysql-devcontainer-sources:/workspace:cached
+    networks:
+      #- default
+      - docker-socket-proxy
+    depends_on:
+      - unison
+
+  unison:
+    build:
+      context: .
+      dockerfile: services/unison/Containerfile
+      args:
+        OWNER_UID: 100
+        OWNER_GID: 101
+    user: root
+    environment:
+      UNISON_SRC: /host
+      UNISON_DEST: /data
+      APP_VOLUME: /data
+      UNISON_PROFILE: default.prf
+      OWNER_UID: 100
+      OWNER_GID: 101
+      UNISON_ARGS: "-auto -batch -perms 0 -prefer newer -times -ui text -ignore 'Name {packed-refs,node_modules,build,.unison}' -ignore 'Regex delme' -ignore 'Regex .*/\\.git(/.*)?/(objects|refs|logs)/.*'"
+      UNISON_WATCH_ARGS: "-repeat watch"
+      UNISONLOCALHOSTNAME: rx-mysql-devcontainer
+      TZ: Asia/Jerusalem
+    volumes:
+      - ../:/host:cached                    # Host folder as read-only bind mount for security
+      - rx-mysql-devcontainer-sources:/data # Docker volume for synced files
+      - ./services/unison/docker-entrypoint.d:/docker-entrypoint.d:ro
+      - ./services/unison/.unison:/home/unisonuser/.unison:cached
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true              # Disable privilege escalation
+    tmpfs:
+      - /tmp                                # Writable temp space if needed
+    network_mode: none                      # No network access for security
+    logging:
+      options:
+        max-size: 10m
+
+  docker-socket-proxy:
+    image: lscr.io/linuxserver/socket-proxy:latest
+    restart: unless-stopped
+    networks:
+      - docker-socket-proxy
+    read_only: true
+    tmpfs:
+      - /run
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment: # https://docs.linuxserver.io/images/docker-socket-proxy/#parameters
+      ALLOW_START: 1
+      ALLOW_STOP: 1
+      ALLOW_RESTART: 1
+      POST: 0 # no run or exec
+      BUILD: 1
+      EXEC: 1
+      SYSTEM: 0
+      CONTAINERS: 1
+      IMAGES: 0
+      VOLUMES: 0
+      NETWORKS: 0
+    logging:
+      options:
+        max-size: 10m
+
+networks:
+  docker-socket-proxy:
+    driver: bridge
+    internal: true
+
+volumes:
+  rx-mysql-devcontainer-sources:
+    name: rx-mysql-devcontainer-sources

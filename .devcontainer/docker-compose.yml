@@ -1,0 +1,30 @@
+name: rx-mysql-devcontainer
+services:
+  vscode:
+    build:
+      context: .
+      dockerfile: Containerfile
+      args:
+        USER: vscode
+        WORKDIR: /workspace
+    user: vscode
+    working_dir: /workspace
+    # Overrides default command so things don't shut down after the process ends.
+    command: /bin/sh -c "while sleep 1000; do :; done"
+    environment:
+      SHELL: /bin/bash
+    volumes:
+      - rx-mysql-devcontainer-profile:/home/vscode
+      - rx-mysql-devcontainer-vscode-server-data:/home/vscode/.vscode-server/data/User
+      - ../:/workspace:cached
+    logging:
+      options:
+        max-size: 25m
+    networks:
+      - default
+
+volumes:
+  rx-mysql-devcontainer-profile:
+    name: rx-mysql-devcontainer-profile
+  rx-mysql-devcontainer-vscode-server-data:
+    name: rx-mysql-devcontainer-vscode-server-data

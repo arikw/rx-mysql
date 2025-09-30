@@ -1,0 +1,7 @@
+FROM ghcr.io/eugenmayer/unison:2.52.1-4.12.0
+
+# Pre-create a user with the UID/GID we will always use
+ARG OWNER_UID=1000
+ARG OWNER_GID=1000
+RUN addgroup -g ${OWNER_GID} unisongroup && \
+    adduser -D -u ${OWNER_UID} -G unisongroup unisonuser
