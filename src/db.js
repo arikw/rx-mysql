@@ -24,6 +24,13 @@ async function init(config = {}) {
     tunnelServer,
     pool;
 
+  // for test mode
+  let
+    lastQuery,
+    lastTransaction,
+    transationStarted = false,
+    resultsByMatch;
+
   const poolConfig = Object.assign({
     host:               config.host               ?? poolConfigDefaults.host,
     database:           config.database           ?? poolConfigDefaults.database,
@@ -38,11 +45,12 @@ async function init(config = {}) {
 
   const connectionConfig = {
     maxExecutionTime:   config.maxExecutionTime   ?? process.env.MYSQL_MAX_EXECUTION_TIME ?? 30000, // in milliseconds
-    lazyConnect:        config.lazyConnect        ?? ((process.env.DB_LAZY_CONNECT ?? 'true') === 'true')
+    lazyConnect:        config.lazyConnect        ?? ((process.env.MYSQL_LAZY_CONNECT ?? 'true') === 'true')
   };
 
   const generalConfig = {
-    logLevel:           config.logLevel           ?? (process.env.MYSQL_LOG_LEVEL ?? (process.env.NODE_ENV === 'development' ? 'debug' : 'error'))
+    logLevel:           config.logLevel           ?? (process.env.MYSQL_LOG_LEVEL ?? (process.env.NODE_ENV === 'development' ? 'debug' : 'error')),
+    testMode:           config.testMode           ?? ((process.env.MYSQL_TEST_MODE === 'true') === true)
   };
 
   const sshTunnelConfig = {
@@ -73,6 +81,11 @@ async function init(config = {}) {
   };
 
   function connect() {
+
+    if (generalConfig.testMode === true) {
+      log('TEST MODE - simulating db connection');
+      return Promise.resolve({ pool: null });
+    }
 
     if (connectionPromise) {
       return connectionPromise;
@@ -287,11 +300,65 @@ async function init(config = {}) {
     });
   }
 
+  function createTestPoolProxy() {
+    const testPool = new Proxy({}, {
+      get(target, prop, receiver) {
+        if (['escape', 'escapeId', 'format'].includes(prop)) {
+          if (!pool) {
+            return mysql[prop];
+          }
+        } else if (['query'].includes(prop)) {
+          return async (sql, values, options) => {
+            lastQuery = queryFormat.call(mysql, sql, values);
+            if (transationStarted) {
+              lastTransaction += `\n${lastQuery};`;
+            }
+            log('TEST MODE - simulating db query');
+            if (resultsByMatch) {
+              const matched = resultsByMatch.find(({ regex }) => regex.test(lastQuery));
+              if (matched) {
+                return matched.result;
+              }
+            }
+            return [];
+          };
+        } else if (prop === 'getConnection') {
+          return () => {
+            return testPool;
+          };
+        } else if (prop === 'beginTransaction') {
+          return () => {
+            transationStarted = true;
+            lastTransaction = 'START TRANSACTION;';
+            return testPool;
+          };
+        } else if (prop === 'commit') {
+          return () => { transationStarted = false; lastTransaction += '\nCOMMIT;'; };
+        } else if (prop === 'rollback') {
+          return () => { transationStarted = false; lastTransaction += '\nROLLBACK;'; };
+        } else if (prop === 'then') {
+          // Allow await on the lazy pool itself
+          return undefined;
+        } else if (prop === 'lastQuery') {
+          return lastQuery;
+        } else if (prop === 'release') {
+          return () => {
+            // do nothing
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      }
+    });
+    return testPool;
+  }
+
   let resultedPool;
-  if (connectionConfig.lazyConnect !== true) {
-    resultedPool = (await connect()).pool;
-  } else {
+  if (generalConfig.testMode === true) {
+    resultedPool = createTestPoolProxy();
+  } else if (connectionConfig.lazyConnect === true) {
     resultedPool = createLazyPoolProxy();
+  } else {
+    resultedPool = (await connect()).pool;
   }
 
   return {
@@ -303,7 +370,16 @@ async function init(config = {}) {
     escape: (...args) => resultedPool.escape(...args),
     escapeId: (...args) => resultedPool.escapeId(...args),
     format: (...args) => resultedPool.format(...args),
-    getConnection: (...args) => resultedPool.getConnection(...args)
+    getConnection: (...args) => resultedPool.getConnection(...args),
+    ...(generalConfig.testMode === true) ? {
+      getLastQuery: () => lastQuery,
+      setResultsByMatch: (newResultsByMatch) => { resultsByMatch = newResultsByMatch; },
+      getLastTransaction: () => lastTransaction,
+      clearLastQuery: () => { lastQuery = null; },
+      clearResultsByMatch: () => { resultsByMatch = null; },
+      clearLastTransaction: () => { lastTransaction = null; transationStarted = false; },
+      clearAll: () => { lastQuery = null; resultsByMatch = null; lastTransaction = null; transationStarted = false; }
+    } : {}
   };
 }
 

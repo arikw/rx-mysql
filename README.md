@@ -150,6 +150,7 @@ Below is a comprehensive list of available configuration options, their correspo
 | `MYSQL_LAZY_CONNECT`            | `lazyConnect`                      | `true`             | Whether to connect to the database only on the first query.   |
 | `MYSQL_LOG_LEVEL`               | `logLevel`                         | `'debug' (dev) / 'error' (prod)` | Logging level for database operations.                        |
 | `MYSQL_CONNECTION_LIMIT`        | `connectionLimit`                  | `15`               | Maximum number of connections in the pool.                    |
+| `MYSQL_TEST_MODE`               | `testMode`                         | `false`            | Enables test mode, exposing utility methods for testing.      |
 | `DB_SSH_TUNNEL_HOST`            | `sshTunnel.sshOptions.host`        | None               | The SSH server host for SSH tunneling.                        |
 | `DB_SSH_TUNNEL_PORT`            | `sshTunnel.sshOptions.port`        | `22`               | The SSH server port.                                          |
 | `DB_SSH_TUNNEL_USERNAME`        | `sshTunnel.sshOptions.username`    | `'root'`           | The username for SSH authentication.                          |
@@ -361,6 +362,86 @@ sshTunnel: {
     dstPort: 3377
   }
 }
+```
+
+## Testing
+
+To enable test mode, set the environment variable `MYSQL_TEST_MODE` to `true`. When in test mode, `rx-mysql` exposes several methods for inspecting and manipulating query results without actually hitting a database. This is useful for testing your application's database interactions.
+
+### Enabling Test Mode
+
+To enable test mode, pass `testMode: true` to the `mysql()` initialization function:
+
+```javascript
+const mysql = require('rx-mysql');
+// The 'mysql' variable here is the init function exported by 'src/db.js'
+const { query, beginTransaction, disconnect, clearAll } = await mysql({
+  testMode: true
+});
+// ... your test code
+```
+
+### Test Utility Methods
+
+When `MYSQL_TEST_MODE` is enabled, the `rx-mysql` instance returned by `await mysql()` will include the following additional methods:
+
+#### `getLastQuery()`
+
+Returns the last executed query object, which includes the SQL string and the bound values.
+
+```javascript
+const { query, getLastQuery } = await mysql({ testMode: true });
+await query('SELECT * FROM users WHERE id = :id', { id: 1 });
+const lastQuery = getLastQuery();
+console.log(lastQuery);
+// Expected output: 'SELECT * FROM users WHERE id = 1'
+```
+
+#### `setResultsByMatch(match, results)`
+
+Configures the test mode to return specific `results` when a query matching the provided `match` (a regex or string) is executed.
+
+```javascript
+const { query, setResultsByMatch } = await mysql({ testMode: true });
+setResultsByMatch([
+  { regex: /^SELECT\s/, result: [{ id: 1, name: 'Test User' }, { id: 2, name: 'Test User2' }] },
+  { regex: /.*/, result: [{}] }
+]);
+const users = await query('SELECT * FROM users');
+console.log(users);
+// Expected output: [{ id: 1, name: 'Test User' }, { id: 2, name: 'Test User2' }]
+```
+
+#### `getLastTransaction()`
+
+Returns the last transaction object, allowing inspection of queries executed within it.
+
+```javascript
+const { beginTransaction, getLastTransaction } = await mysql({ testMode: true });
+const transaction = await beginTransaction();
+await transaction.query('INSERT INTO logs (message) VALUES (:message)', { message: 'Test log' });
+await transaction.commit();
+const lastTransaction = getLastTransaction();
+console.log(lastTransaction.queries[0]);
+// Expected output: "START TRANSACTION; INSERT INTO logs (message) VALUES ('Test log'); COMMIT;"
+```
+
+#### Clearing Test State
+
+The following methods are available to clear the internal test state:
+
+- `clearLastQuery()`: Clears the last stored query.
+- `clearResultsByMatch()`: Clears all configured query match results.
+- `clearLastTransaction()`: Clears the last stored transaction.
+- `clearAll()`: Clears all of the above test states (last query, results by match, and last transaction).
+
+```javascript
+const { clearAll, getLastQuery } = await mysql({ testMode: true });
+// ... perform some queries
+clearAll();
+const lastQuery = getLastQuery();
+console.log(lastQuery);
+// Expected output: null
 ```
 
 ## Contributing
