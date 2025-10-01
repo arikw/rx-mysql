@@ -1,0 +1,58 @@
+# Use the official Node Alpine image
+FROM node:24-alpine
+
+# Install common tooling
+RUN apk add --no-cache \
+      bash bash-completion git github-cli openssh-client curl nano coreutils jq unison tmux sed rsync && \
+    apk add --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community \
+      docker-cli docker-cli-compose && \
+    apk add --repository=http://dl-cdn.alpinelinux.org/alpine/edge/testing \
+      edit fnm
+
+# Switch to the non-root user early
+
+ARG USER
+
+# create and set up node user (if your base image doesn’t already)
+RUN addgroup -S $USER && adduser -S -G $USER $USER
+
+# Create docker group and restrict access to docker binaries
+RUN addgroup -S docker || true && \
+  chown root:docker /usr/bin/docker /usr/bin/docker-compose && \
+  chmod 750 /usr/bin/docker /usr/bin/docker-compose && \
+  addgroup $USER docker
+
+RUN mkdir -p /workspaces && \
+    chmod 700 /workspaces && \
+    chown $USER:$USER /workspaces
+
+USER $USER
+
+ARG WORKDIR=/workspace
+ENV WORKDIR=$WORKDIR
+WORKDIR /workspace
+ENV HOME=/home/$USER
+
+# (Optional) Configure npm to install global packages into your home
+ENV NPM_CONFIG_PREFIX=/home/$USER/.npm-global \
+    PATH=/home/$USER/.npm-global/bin:$PATH
+
+RUN npm install -g http-server
+
+# Add docker bash completion
+RUN touch $HOME/.bashrc && \
+  echo "source <(docker completion bash)" >> $HOME/.bashrc
+
+## Create the mount points (700)
+RUN mkdir -p /home/$USER/.vscode-server && \
+    mkdir -p /home/$USER/.vscode-server/data/User && \
+    mkdir -p /home/$USER/.docker && \
+    mkdir -p /workspaces/host && \
+    chmod 700 /home/$USER/.docker && \
+    chmod 700 /workspaces/host && \
+    chmod 700 /home/$USER/.vscode-server/data/User && \
+    chmod 700 /home/$USER/.vscode-server
+
+COPY --chown=$USER:$USER ./startup.sh /usr/local/bin/startup.sh
+
+RUN chmod +x /usr/local/bin/startup.sh

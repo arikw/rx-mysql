@@ -1,0 +1,50 @@
+{
+  "name": "RX Mysql Dev Env",
+
+  //"dockerComposeFile": "./docker-compose.yml",
+  "dockerComposeFile": [
+    "./docker-compose.yml",
+    "./docker-compose.override.yml"
+  ],
+  "service": "vscode",
+
+  "containerUser": "vscode",
+  "remoteUser": "vscode",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.shell.linux": "/bin/bash",
+        "terminal.integrated.profiles.linux": {
+          "bash": {
+            "path": "bash",
+            "icon": "terminal-bash"
+          }
+        },
+        "files.watcherExclude": {
+          "**/.git/**": true,
+          "**/node_modules/**": true
+        },
+        "remote.localPortHost": "allInterfaces"
+      },
+      "extensions": [
+        "saoudrizwan.claude-dev",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "EditorConfig.EditorConfig",
+        "mikestead.dotenv",
+        "pustelto.bracketeer",
+        "ExodiusStudios.comment-anchors",
+        "Tobermory.es6-string-html",
+        "stylelint.vscode-stylelint",
+        "meganrogge.template-string-converter",
+        "eamodio.gitlens"
+      ]
+    }
+  },
+  "postStartCommand": "/usr/local/bin/startup.sh",
+
+  "waitFor": "postStartCommand"
+}
