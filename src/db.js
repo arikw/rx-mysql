@@ -28,7 +28,7 @@ async function init(config = {}) {
   let
     lastQuery,
     lastTransaction,
-    transationStarted = false,
+    transactionStarted = false,
     resultsByMatch;
 
   const poolConfig = Object.assign({
@@ -310,7 +310,7 @@ async function init(config = {}) {
         } else if (['query'].includes(prop)) {
           return async (sql, values, options) => {
             lastQuery = queryFormat.call(mysql, sql, values);
-            if (transationStarted) {
+            if (transactionStarted) {
               lastTransaction += `\n${lastQuery};`;
             }
             log('TEST MODE - simulating db query');
@@ -328,14 +328,14 @@ async function init(config = {}) {
           };
         } else if (prop === 'beginTransaction') {
           return () => {
-            transationStarted = true;
+            transactionStarted = true;
             lastTransaction = 'START TRANSACTION;';
             return testPool;
           };
         } else if (prop === 'commit') {
-          return () => { transationStarted = false; lastTransaction += '\nCOMMIT;'; };
+          return () => { transactionStarted = false; lastTransaction += '\nCOMMIT;'; };
         } else if (prop === 'rollback') {
-          return () => { transationStarted = false; lastTransaction += '\nROLLBACK;'; };
+          return () => { transactionStarted = false; lastTransaction += '\nROLLBACK;'; };
         } else if (prop === 'then') {
           // Allow await on the lazy pool itself
           return undefined;
@@ -377,8 +377,8 @@ async function init(config = {}) {
       getLastTransaction: () => lastTransaction,
       clearLastQuery: () => { lastQuery = null; },
       clearResultsByMatch: () => { resultsByMatch = null; },
-      clearLastTransaction: () => { lastTransaction = null; transationStarted = false; },
-      clearAll: () => { lastQuery = null; resultsByMatch = null; lastTransaction = null; transationStarted = false; }
+      clearLastTransaction: () => { lastTransaction = null; transactionStarted = false; },
+      clearAll: () => { lastQuery = null; resultsByMatch = null; lastTransaction = null; transactionStarted = false; }
     } : {}
   };
 }
