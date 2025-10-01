@@ -1,43 +1,28 @@
 const
   chai = require('chai'),
-  fs = require('fs'),
-  path = require('path'),
-  mock = require('mock-require'),
-  { escape, escapeId } = require('mysql2/promise'),
+  dbHelpers = require('../helpers/db.js'),
 
-  expect = chai.expect;
+  { expect } = chai;
 
-let
-  lastDatabaseQuery = null,
-  lastNormalizedDatabaseQuery = null,
-  db;
+let db = null;
 
 describe('templating and bind variables', () => {
 
   before(async () => {
-
-    const { queryFormat } = require('../src/helpers.js');
-
-    mock('mysql2/promise', {
-      createPool: () => ({
-        query: async (...args) => {
-          lastDatabaseQuery = queryFormat.apply({ escape, escapeId }, args);
-          lastNormalizedDatabaseQuery = normalizeQueryString(lastDatabaseQuery);
-          return [[]];
-        },
-        on: () => {}
-      })
+    db = await require('../../src/db.js')({
+      testMode: true
     });
-
-    db = (await require('../src/index.js')());
-
   });
 
   after(() => {
-    mock.stopAll();
+    db.clearAll();
+    db = null;
   });
 
   it('final query as expected', async () => {
+    db.setResultsByMatch([
+      { regex: /.*/, result: [{}] }
+    ]);
 
     await db.query(/*sql*/`
       SELECT
@@ -83,21 +68,6 @@ describe('templating and bind variables', () => {
         year: 2017
       }
     });
-    expect(readAndNormalizeQueryFile('./queries/tv-shows.sql'), 'got unexpected db query').to.be.equal(lastNormalizedDatabaseQuery);
-
+    expect(dbHelpers.getQueryFromFile('./unit/data/queries/tv-shows.sql'), 'got unexpected db query').to.be.equal(dbHelpers.normalizeQuery(db.getLastQuery()));
   });
 });
-
-function normalizeQueryString(query) {
-  return query
-    .replace(/\r/g, '') // convert crlf to lf
-    .replace(/^\s*--\s.*$/gm, '') // remove sql comments
-    .replace(/^\s*$/gm, '') // trim empty lines
-    .replace(/^\s*/gm, '') // trim leading whitespaces
-    .replace(/\s*$/gm, '') // trim line end whitespaces
-    .replace(/\n+/gm, '\n'); // remove empty lines
-}
-
-function readAndNormalizeQueryFile(relativePath) {
-  return normalizeQueryString(fs.readFileSync(path.resolve(__dirname, relativePath), 'utf8'));
-}
